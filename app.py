@@ -1,44 +1,25 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import yt_dlp
+from flask import Flask, request, jsonify, send_file
+from downloader import get_streams, download_video
+import os
 
 app = Flask(__name__)
-CORS(app)
 
-@app.route("/api/info", methods=["POST"])
-def get_info():
-    url = request.json.get("url")
+@app.route("/api/info", methods=["GET"])
+def get_video_info():
+    url = request.args.get("url")
     if not url:
-        return jsonify({"error": "No URL provided"}), 400
+        return jsonify({"error": "Missing URL"}), 400
+    streams = get_streams(url)
+    return jsonify(streams)
 
-    try:
-        ydl_opts = {"quiet": True, "skip_download": True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            video = []
-            audio = []
+@app.route("/api/download", methods=["GET"])
+def download():
+    url = request.args.get("url")
+    quality = request.args.get("quality")
+    name = request.args.get("name") or "video.mp4"
 
-            for fmt in info.get("formats", []):
-                if fmt.get("vcodec") != "none" and fmt.get("acodec") == "none":
-                    video.append({
-                        "quality": fmt.get("format_note"),
-                        "ext": fmt.get("ext"),
-                        "url": fmt.get("url")
-                    })
-                elif fmt.get("acodec") != "none" and fmt.get("vcodec") == "none":
-                    audio.append({
-                        "quality": fmt.get("abr", "unknown"),
-                        "ext": fmt.get("ext"),
-                        "url": fmt.get("url")
-                    })
-
-            return jsonify({
-                "title": info.get("title"),
-                "video": video,
-                "audio": audio
-            })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    filepath = download_video(url, quality, name)
+    return send_file(filepath, as_attachment=True)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
