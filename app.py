@@ -3,7 +3,10 @@ from downloader import get_streams, download_video
 import os
 
 app = Flask(__name__)
-
+@app.route('/')
+def home():
+    return 'Video Downloader Backend is running'
+    
 @app.route("/api/info", methods=["GET"])
 def get_video_info():
     url = request.args.get("url")
